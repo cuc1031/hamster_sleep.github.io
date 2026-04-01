@@ -2,23 +2,30 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>小倉睡覺存錢筒</title>
-  <style>
-    body { font-family: Arial; text-align: center; margin-top: 50px; }
-    button { padding: 10px 20px; margin: 10px; font-size: 16px; }
-    .status { margin-top: 20px; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h1>小倉睡覺存錢筒</h1>
+<body class="bg-gradient-to-br from-indigo-100 to-blue-200 min-h-screen flex items-center justify-center">
 
-  <button onclick="checkIn('sleep')">睡覺打卡</button>
-  <button onclick="checkIn('wake')">起床打卡</button>
+<div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-md">
+  <h1 class="text-2xl font-bold text-center mb-4">🐹 小倉睡覺存錢筒</h1>
 
-  <div class="status">
-    <p id="todayStatus"></p>
-    <p id="money"></p>
+  <div class="flex justify-between mb-4">
+    <button onclick="checkIn('sleep')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl w-1/2 mr-2">😴 睡覺打卡</button>
+    <button onclick="checkIn('wake')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-2">🌞 起床打卡</button>
   </div>
+
+  <div class="bg-gray-100 rounded-xl p-3 mb-3">
+    <p class="text-sm text-gray-600">今日狀態</p>
+    <pre id="todayStatus" class="text-sm"></pre>
+  </div>
+
+  <div class="bg-yellow-100 rounded-xl p-3 text-center">
+    <p class="text-sm text-gray-600">本週金額</p>
+    <p id="money" class="text-2xl font-bold text-yellow-700"></p>
+  </div>
+</div>
 
 <script>
 const START_HOUR = 2;
@@ -98,9 +105,8 @@ function evaluateDay(today, data) {
 
 function dailyCheck() {
   const data = getData();
-  const today = getTodayKey();
 
-  for (let day in data.records) {
+  for (let day in (data.records || {})) {
     const record = data.records[day];
 
     if (!record.evaluated) {
@@ -123,12 +129,13 @@ function render() {
     record ? JSON.stringify(record, null, 2) : '今天尚未打卡';
 
   document.getElementById('money').innerText =
-    '本週金額: ' + (data.money ?? 20) + ' 元';
+    (data.money ?? 20) + ' 元';
 }
 
 initWeek();
 dailyCheck();
 render();
 </script>
+
 </body>
 </html>
