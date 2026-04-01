@@ -1,183 +1,242 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>小倉睡覺存錢筒</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小倉睡覺存錢筒</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gradient-to-br from-indigo-100 to-blue-200 min-h-screen flex items-center justify-center">
 
 <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-md">
-  <h1 class="text-2xl font-bold text-center mb-4">🐹 小倉睡覺存錢筒</h1>
 
-  <div class="flex justify-between mb-4">
-    <button onclick="checkIn('sleep')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl w-1/2 mr-2">😴 睡覺打卡</button>
-    <button onclick="checkIn('wake')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-2">🌞 起床打卡</button>
-  </div>
+<h1 class="text-2xl font-bold text-center mb-4">🐹 小倉睡覺存錢筒</h1>
 
-  <div class="bg-gray-100 rounded-xl p-3 mb-3">
-    <p class="text-sm text-gray-600">今日狀態</p>
-    <pre id="todayStatus" class="text-sm"></pre>
-  </div>
+<div class="flex justify-between mb-4">
+<button onclick="checkIn('sleep')" id="sleepBtn"
+class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl w-1/2 mr-2">
+😴 睡覺打卡
+</button>
 
-  <div class="bg-yellow-100 rounded-xl p-3 text-center">
-    <p class="text-sm text-gray-600">本週金額</p>
-    <p id="money" class="text-2xl font-bold text-yellow-700"></p>
-  </div>
+<button onclick="checkIn('wake')" id="wakeBtn"
+class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-2">
+🌞 起床打卡
+</button>
+</div>
+
+<div class="bg-gray-100 rounded-xl p-3 mb-3">
+<p class="text-sm text-gray-600">今日狀態</p>
+<pre id="todayStatus" class="text-sm"></pre>
+</div>
+
+<div class="bg-yellow-100 rounded-xl p-3 text-center">
+<p class="text-sm text-gray-600">累積存款</p>
+<p id="money" class="text-2xl font-bold text-yellow-700"></p>
+</div>
+
 </div>
 
 <script>
+
 const START_HOUR = 2;
 const END_HOUR = 5;
 
-function getData() {
-  return JSON.parse(localStorage.getItem('sleepData') || '{}');
+function getData(){
+return JSON.parse(localStorage.getItem('sleepData') || '{}');
 }
 
-function saveData(data) {
-  localStorage.setItem('sleepData', JSON.stringify(data));
+function saveData(data){
+localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-function getTodayKey() {
-  const d = new Date();
-  return d.toISOString().split('T')[0];
+function getTodayKey(){
+const d = new Date();
+return d.toISOString().split('T')[0];
 }
 
-function initWeek() {
-  const data = getData();
-  const now = new Date();
-  const week = getWeekNumber(now);
-
-  if (data.week !== week) {
-    data.week = week;
-    data.money = 20;
-    data.records = {};
-    saveData(data);
-  }
+function getWeekNumber(d){
+const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+const dayNum = date.getUTCDay() || 7;
+date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
 }
 
-function getWeekNumber(d) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
-  return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+function initWeek(){
+
+const data = getData();
+const now = new Date();
+
+if(data.money === undefined) data.money = 0;
+
+const today = getTodayKey();
+const day = now.getDay();
+
+if(!data.lastRewardDate) data.lastRewardDate = "";
+
+if(day === 4 && data.lastRewardDate !== today){
+
+data.money += 20;
+data.lastRewardDate = today;
+
 }
 
-function checkIn(type) {
-  initWeek();
-  const data = getData();
-  const today = getTodayKey();
+saveData(data);
 
-  if (!data.records) data.records = {};
-  if (!data.records[today]) data.records[today] = {};
-
-  const record = data.records[today];
-
-  // 如果今天已經判定完成就不能再打卡
-  if (record.evaluated) {
-    alert("今天已經完成紀錄，不能再打卡！");
-    return;
-  }
-
-  // 睡覺卡只能打一次
-  if (type === 'sleep') {
-    if (record.sleep) {
-      alert("今天已經打過睡覺卡了！");
-      return;
-    }
-    record.sleep = new Date().toISOString();
-  }
-
-  // 起床卡限制
-  if (type === 'wake') {
-
-    // 必須先睡覺
-    if (!record.sleep) {
-      alert("請先打睡覺卡！");
-      return;
-    }
-
-    // 起床卡只能一次
-    if (record.wake) {
-      alert("今天已經打過起床卡了！");
-      return;
-    }
-
-    record.wake = new Date().toISOString();
-  }
-
-  evaluateDay(today, data);
-
-  saveData(data);
-  render();
 }
 
-function evaluateDay(today, data) {
-  const record = data.records[today];
+function checkIn(type){
 
-  if (record.evaluated) return;
+initWeek();
 
-  if (record.sleep && record.wake) {
-    const sleepTime = new Date(record.sleep).getHours();
-    const wakeTime = new Date(record.wake).getHours();
+const data = getData();
+const today = getTodayKey();
 
-    const valid = (sleepTime <= START_HOUR || sleepTime >= 21) && wakeTime >= END_HOUR;
+if(!data.records) data.records = {};
+if(!data.records[today]) data.records[today] = {};
 
-    if (!valid) {
-      data.money -= 10;
-      record.result = '違規 ❌';
-    } else {
-      record.result = '成功 ✅';
-    }
+const record = data.records[today];
 
-    record.evaluated = true;
-  }
+if(record.evaluated){
+alert("今天已經完成紀錄，不能再打卡！");
+return;
 }
 
-function dailyCheck() {
-  const data = getData();
+if(type === "sleep"){
 
-  for (let day in (data.records || {})) {
-    const record = data.records[day];
-
-    if (!record.evaluated) {
-      data.money -= 10;
-      record.result = '未完成 ❌';
-      record.evaluated = true;
-    }
-  }
-
-  saveData(data);
+if(record.sleep){
+alert("今天已經打過睡覺卡了！");
+return;
 }
 
-function render() {
-  const data = getData();
-  const today = getTodayKey();
+record.sleep = new Date().toISOString();
 
-  const record = data.records?.[today];
+}
 
-  if (!record) {
-    document.getElementById('todayStatus').innerText = '今天尚未打卡';
-  } else {
-    const sleep = record.sleep ? new Date(record.sleep).toLocaleString() : '未打卡';
-    const wake = record.wake ? new Date(record.wake).toLocaleString() : '未打卡';
-    const result = record.result || '尚未判定';
+if(type === "wake"){
 
-    document.getElementById('todayStatus').innerText =
-      `😴 睡覺時間：${sleep}
+if(!record.sleep){
+alert("請先打睡覺卡！");
+return;
+}
+
+if(record.wake){
+alert("今天已經打過起床卡了！");
+return;
+}
+
+record.wake = new Date().toISOString();
+
+}
+
+evaluateDay(today,data);
+
+saveData(data);
+
+render();
+
+}
+
+function evaluateDay(today,data){
+
+const record = data.records[today];
+
+if(record.evaluated) return;
+
+if(record.sleep && record.wake){
+
+const sleepTime = new Date(record.sleep).getHours();
+const wakeTime = new Date(record.wake).getHours();
+
+const valid = (sleepTime <= START_HOUR || sleepTime >= 21) && wakeTime >= END_HOUR;
+
+if(!valid){
+
+data.money -= 10;
+record.result = "違規 ❌";
+
+}
+else{
+
+record.result = "成功 ✅";
+
+}
+
+record.evaluated = true;
+
+}
+
+}
+
+function dailyCheck(){
+
+const data = getData();
+
+for(let day in (data.records || {})){
+
+const record = data.records[day];
+
+if(!record.evaluated){
+
+data.money -= 10;
+record.result = "未完成 ❌";
+record.evaluated = true;
+
+}
+
+}
+
+saveData(data);
+
+}
+
+function render(){
+
+const data = getData();
+const today = getTodayKey();
+
+const record = data.records?.[today];
+
+if(!record){
+
+document.getElementById("todayStatus").innerText = "今天尚未打卡";
+
+}
+else{
+
+const sleep = record.sleep ? new Date(record.sleep).toLocaleString() : "未打卡";
+const wake = record.wake ? new Date(record.wake).toLocaleString() : "未打卡";
+const result = record.result || "尚未判定";
+
+document.getElementById("todayStatus").innerText =
+`😴 睡覺時間：${sleep}
 🌞 起床時間：${wake}
 📊 結果：${result}`;
-  }
 
-  document.getElementById('money').innerText =
-    (data.money ?? 20) + ' 元';
+}
+
+document.getElementById("money").innerText =
+(data.money ?? 0) + " 元";
+
+updateButtons(record);
+
+}
+
+function updateButtons(record){
+
+const sleepBtn = document.getElementById("sleepBtn");
+const wakeBtn = document.getElementById("wakeBtn");
+
+sleepBtn.disabled = record?.sleep;
+wakeBtn.disabled = !record?.sleep || record?.wake;
+
 }
 
 initWeek();
 dailyCheck();
 render();
+
 </script>
 
 </body>
