@@ -41,21 +41,48 @@ class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-
 
 <script>
 
-const BIN_ID = "69cd599aaaba882197b64fcc";
+const BIN_ID="69cd599aaaba882197b64fcc"
 
-const START_HOUR = 2;
-const END_HOUR = 5;
+const START_HOUR=2
+const END_HOUR=5
+
+let cacheData=null
 
 async function getData(){
 
-const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`);
-const json = await res.json();
+try{
 
-return json.record;
+const res=await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`)
+
+if(!res.ok) throw new Error()
+
+const json=await res.json()
+
+cacheData=json.record
+
+return cacheData
+
+}catch(e){
+
+console.log("JSONBin 失敗，改用 localStorage")
+
+const local=localStorage.getItem("sleepData")
+
+if(local) return JSON.parse(local)
+
+return {money:0,records:{},lastRewardDate:""}
+
+}
 
 }
 
 async function saveData(data){
+
+cacheData=data
+
+localStorage.setItem("sleepData",JSON.stringify(data))
+
+try{
 
 await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
 method:"PUT",
@@ -63,31 +90,40 @@ headers:{
 "Content-Type":"application/json"
 },
 body:JSON.stringify(data)
-});
+})
+
+}catch(e){
+
+console.log("雲端寫入失敗，已存本地")
+
+}
 
 }
 
 function getTodayKey(){
-return new Date().toISOString().split("T")[0];
+
+return new Date().toISOString().split("T")[0]
+
 }
 
 async function initWeek(){
 
-const data = await getData();
+const data=await getData()
 
-const now = new Date();
-const today = getTodayKey();
+const now=new Date()
 
-if(data.money === undefined) data.money = 0;
-if(!data.records) data.records = {};
-if(!data.lastRewardDate) data.lastRewardDate = "";
+const today=getTodayKey()
 
-if(now.getDay() === 4 && data.lastRewardDate !== today){
+if(data.money===undefined) data.money=0
+if(!data.records) data.records={}
+if(!data.lastRewardDate) data.lastRewardDate=""
 
-data.money += 20;
-data.lastRewardDate = today;
+if(now.getDay()===4 && data.lastRewardDate!==today){
 
-await saveData(data);
+data.money+=20
+data.lastRewardDate=today
+
+await saveData(data)
 
 }
 
@@ -95,90 +131,91 @@ await saveData(data);
 
 async function checkIn(type){
 
-await initWeek();
+await initWeek()
 
-const data = await getData();
-const today = getTodayKey();
+const data=await getData()
 
-if(!data.records[today]) data.records[today] = {};
+const today=getTodayKey()
 
-const record = data.records[today];
+if(!data.records[today]) data.records[today]={}
+
+const record=data.records[today]
 
 if(record.evaluated){
 
-alert("今天已經完成紀錄");
-return;
+alert("今天已完成紀錄")
+return
 
 }
 
-if(type === "sleep"){
+if(type==="sleep"){
 
 if(record.sleep){
 
-alert("今天已打過睡覺卡");
-return;
+alert("今天已打過睡覺卡")
+return
 
 }
 
-record.sleep = new Date().toISOString();
+record.sleep=new Date().toISOString()
 
 }
 
-if(type === "wake"){
+if(type==="wake"){
 
 if(!record.sleep){
 
-alert("請先打睡覺卡");
-return;
+alert("請先打睡覺卡")
+return
 
 }
 
 if(record.wake){
 
-alert("今天已打過起床卡");
-return;
+alert("今天已打過起床卡")
+return
 
 }
 
-record.wake = new Date().toISOString();
+record.wake=new Date().toISOString()
 
 }
 
-evaluateDay(today,data);
+evaluateDay(today,data)
 
-await saveData(data);
+await saveData(data)
 
-render();
+render()
 
 }
 
 function evaluateDay(today,data){
 
-const record = data.records[today];
+const record=data.records[today]
 
-if(record.evaluated) return;
+if(record.evaluated) return
 
 if(record.sleep && record.wake){
 
-const sleepTime = new Date(record.sleep).getHours();
-const wakeTime = new Date(record.wake).getHours();
+const sleepTime=new Date(record.sleep).getHours()
+const wakeTime=new Date(record.wake).getHours()
 
-const valid =
-(sleepTime <= START_HOUR || sleepTime >= 21) &&
-wakeTime >= END_HOUR;
+const valid=
+(sleepTime<=START_HOUR||sleepTime>=21)&&
+wakeTime>=END_HOUR
 
 if(!valid){
 
-data.money -= 10;
-record.result = "違規 ❌";
+data.money-=10
+record.result="違規 ❌"
 
 }else{
 
-record.result = "成功 ✅";
+record.result="成功 ✅"
 
 }
 
-record.evaluated = true;
+record.evaluated=true
 
 }
 
@@ -186,39 +223,40 @@ record.evaluated = true;
 
 async function render(){
 
-const data = await getData();
-const today = getTodayKey();
+const data=await getData()
 
-const record = data.records?.[today];
+const today=getTodayKey()
+
+const record=data.records?.[today]
 
 if(!record){
 
-document.getElementById("todayStatus").innerText="今天尚未打卡";
+document.getElementById("todayStatus").innerText="今天尚未打卡"
 
 }else{
 
-const sleep = record.sleep ?
-new Date(record.sleep).toLocaleString() : "未打卡";
+const sleep=record.sleep?
+new Date(record.sleep).toLocaleString():"未打卡"
 
-const wake = record.wake ?
-new Date(record.wake).toLocaleString() : "未打卡";
+const wake=record.wake?
+new Date(record.wake).toLocaleString():"未打卡"
 
-const result = record.result || "尚未判定";
+const result=record.result||"尚未判定"
 
-document.getElementById("todayStatus").innerText =
+document.getElementById("todayStatus").innerText=
 `😴 睡覺時間：${sleep}
 🌞 起床時間：${wake}
-📊 結果：${result}`;
+📊 結果：${result}`
 
 }
 
-document.getElementById("money").innerText =
-(data.money ?? 0) + " 元";
+document.getElementById("money").innerText=
+(data.money??0)+" 元"
 
 }
 
-initWeek();
-render();
+initWeek()
+render()
 
 </script>
 
