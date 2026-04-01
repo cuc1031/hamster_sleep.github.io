@@ -25,6 +25,12 @@ class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-
 </button>
 </div>
 
+<!-- ✅ 新增：取消打卡 -->
+<button onclick="resetToday()"
+class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl w-full mb-4">
+↩️ 取消打卡（重置今天）
+</button>
+
 <div class="bg-gray-100 rounded-xl p-3 mb-3">
 <p class="text-sm text-gray-600">今日狀態</p>
 <pre id="todayStatus" class="text-sm"></pre>
@@ -53,14 +59,6 @@ localStorage.setItem('sleepData', JSON.stringify(data));
 function getTodayKey(){
 const d = new Date();
 return d.toISOString().split('T')[0];
-}
-
-function getWeekNumber(d){
-const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-const dayNum = date.getUTCDay() || 7;
-date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
-return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
 }
 
 function initWeek(){
@@ -188,6 +186,43 @@ record.evaluated = true;
 }
 
 saveData(data);
+
+}
+
+// ✅ 新增：重置今天
+function resetToday(){
+
+const data = getData();
+const today = getTodayKey();
+const record = data.records?.[today];
+
+if(!record){
+alert("今天沒有紀錄可以重置！");
+return;
+}
+
+// 還原金額
+if(record.evaluated){
+
+if(record.result === "違規 ❌" || record.result === "未完成 ❌"){
+data.money += 10;
+}
+
+}
+
+// 還原週四獎勵
+if(data.lastRewardDate === today){
+data.money -= 20;
+data.lastRewardDate = "";
+}
+
+// 刪除今日紀錄
+delete data.records[today];
+
+saveData(data);
+render();
+
+alert("今天的打卡已重置！");
 
 }
 
