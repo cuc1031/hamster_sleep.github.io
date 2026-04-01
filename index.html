@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>小倉睡覺存錢筒</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+    .status { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>小倉睡覺存錢筒</h1>
+
+  <button onclick="checkIn('sleep')">睡覺打卡</button>
+  <button onclick="checkIn('wake')">起床打卡</button>
+
+  <div class="status">
+    <p id="todayStatus"></p>
+    <p id="money"></p>
+  </div>
+
+<script>
+const START_HOUR = 2;
+const END_HOUR = 5;
+
+function getData() {
+  return JSON.parse(localStorage.getItem('sleepData') || '{}');
+}
+
+function saveData(data) {
+  localStorage.setItem('sleepData', JSON.stringify(data));
+}
+
+function getTodayKey() {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function initWeek() {
+  const data = getData();
+  const now = new Date();
+  const week = getWeekNumber(now);
+
+  if (data.week !== week) {
+    data.week = week;
+    data.money = 20;
+    data.records = {};
+    saveData(data);
+  }
+}
+
+function getWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+}
+
+function checkIn(type) {
+  initWeek();
+  const data = getData();
+  const today = getTodayKey();
+
+  if (!data.records) data.records = {};
+  if (!data.records[today]) data.records[today] = {};
+
+  data.records[today][type] = new Date().toISOString();
+
+  evaluateDay(today, data);
+
+  saveData(data);
+  render();
+}
+
+function evaluateDay(today, data) {
+  const record = data.records[today];
+
+  if (record.evaluated) return;
+
+  if (record.sleep && record.wake) {
+    const sleepTime = new Date(record.sleep).getHours();
+    const wakeTime = new Date(record.wake).getHours();
+
+    const valid = (sleepTime <= START_HOUR || sleepTime >= 21) && wakeTime >= END_HOUR;
+
+    if (!valid) {
+      data.money -= 10;
+      record.result = '違規 ❌';
+    } else {
+      record.result = '成功 ✅';
+    }
+
+    record.evaluated = true;
+  }
+}
+
+function dailyCheck() {
+  const data = getData();
+  const today = getTodayKey();
+
+  for (let day in data.records) {
+    const record = data.records[day];
+
+    if (!record.evaluated) {
+      data.money -= 10;
+      record.result = '未完成 ❌';
+      record.evaluated = true;
+    }
+  }
+
+  saveData(data);
+}
+
+function render() {
+  const data = getData();
+  const today = getTodayKey();
+
+  const record = data.records?.[today];
+
+  document.getElementById('todayStatus').innerText =
+    record ? JSON.stringify(record, null, 2) : '今天尚未打卡';
+
+  document.getElementById('money').innerText =
+    '本週金額: ' + (data.money ?? 20) + ' 元';
+}
+
+initWeek();
+dailyCheck();
+render();
+</script>
+</body>
+</html>
