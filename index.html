@@ -15,13 +15,11 @@
 
 <div class="flex justify-between mb-4">
 
-<button onclick="checkIn('sleep')" id="sleepBtn"
-class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl w-1/2 mr-2">
+<button onclick="checkIn('sleep')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl w-1/2 mr-2">
 😴 睡覺打卡
 </button>
 
-<button onclick="checkIn('wake')" id="wakeBtn"
-class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-2">
+<button onclick="checkIn('wake')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-2">
 🌞 起床打卡
 </button>
 
@@ -41,33 +39,49 @@ class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl w-1/2 ml-
 
 <script>
 
-const BIN_ID="69cd599aaaba882197b64fcc"
+/* =========================
+   基本設定
+========================= */
 
-const START_HOUR=2
-const END_HOUR=5
+const BIN_ID = "69cd599aaaba882197b64fcc"
+const API_KEY = "$2a$10$1Vh0f1JV5njIk6tmtyJK/.KaRqo2OXvCB5MpTr05vbs6Joba2LClW"
 
-let cacheData=null
+const START_HOUR = 2
+const END_HOUR = 5
+
+let cacheData = null
+
+/* =========================
+   讀資料
+========================= */
 
 async function getData(){
 
 try{
 
-const res=await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`)
+const res = await fetch(
+`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,
+{
+  headers:{
+    "X-Master-Key": API_KEY
+  }
+}
+)
 
-if(!res.ok) throw new Error()
+if(!res.ok){
+  const text = await res.text()
+  throw new Error(text)
+}
 
-const json=await res.json()
-
-cacheData=json.record
-
+const json = await res.json()
+cacheData = json.record
 return cacheData
 
 }catch(e){
 
-console.log("JSONBin 失敗，改用 localStorage")
+console.log("雲端讀取失敗，使用 localStorage", e)
 
-const local=localStorage.getItem("sleepData")
-
+const local = localStorage.getItem("sleepData")
 if(local) return JSON.parse(local)
 
 return {money:0,records:{},lastRewardDate:""}
@@ -76,184 +90,193 @@ return {money:0,records:{},lastRewardDate:""}
 
 }
 
+/* =========================
+   存資料
+========================= */
+
 async function saveData(data){
 
-cacheData=data
-
+cacheData = data
 localStorage.setItem("sleepData",JSON.stringify(data))
 
 try{
 
-await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
-method:"PUT",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify(data)
-})
+await fetch(
+`https://api.jsonbin.io/v3/b/${BIN_ID}`,
+{
+  method:"PUT",
+  headers:{
+    "Content-Type":"application/json",
+    "X-Master-Key":API_KEY
+  },
+  body:JSON.stringify(data)
+}
+)
 
 }catch(e){
-
 console.log("雲端寫入失敗，已存本地")
-
 }
 
 }
+
+/* =========================
+   日期
+========================= */
 
 function getTodayKey(){
-
 return new Date().toISOString().split("T")[0]
-
 }
+
+/* =========================
+   每週獎勵
+========================= */
 
 async function initWeek(){
 
-const data=await getData()
+const data = await getData()
+const now = new Date()
+const today = getTodayKey()
 
-const now=new Date()
+if(data.money === undefined) data.money = 0
+if(!data.records) data.records = {}
+if(!data.lastRewardDate) data.lastRewardDate = ""
 
-const today=getTodayKey()
-
-if(data.money===undefined) data.money=0
-if(!data.records) data.records={}
-if(!data.lastRewardDate) data.lastRewardDate=""
-
-if(now.getDay()===4 && data.lastRewardDate!==today){
-
-data.money+=20
-data.lastRewardDate=today
-
+if(now.getDay() === 4 && data.lastRewardDate !== today){
+data.money += 20
+data.lastRewardDate = today
 await saveData(data)
-
 }
 
 }
+
+/* =========================
+   打卡
+========================= */
 
 async function checkIn(type){
 
 await initWeek()
+const data = await getData()
 
-const data=await getData()
+const today = getTodayKey()
+if(!data.records[today]) data.records[today] = {}
 
-const today=getTodayKey()
-
-if(!data.records[today]) data.records[today]={}
-
-const record=data.records[today]
+const record = data.records[today]
 
 if(record.evaluated){
-
 alert("今天已完成紀錄")
 return
-
 }
 
-if(type==="sleep"){
+if(type === "sleep"){
 
 if(record.sleep){
-
 alert("今天已打過睡覺卡")
 return
+}
+
+record.sleep = new Date().toISOString()
 
 }
 
-record.sleep=new Date().toISOString()
-
-}
-
-if(type==="wake"){
+if(type === "wake"){
 
 if(!record.sleep){
-
 alert("請先打睡覺卡")
 return
-
 }
 
 if(record.wake){
-
 alert("今天已打過起床卡")
 return
-
 }
 
-record.wake=new Date().toISOString()
+record.wake = new Date().toISOString()
 
 }
 
 evaluateDay(today,data)
-
 await saveData(data)
-
 render()
 
 }
 
+/* =========================
+   判定
+========================= */
+
 function evaluateDay(today,data){
 
-const record=data.records[today]
-
+const record = data.records[today]
 if(record.evaluated) return
 
 if(record.sleep && record.wake){
 
-const sleepTime=new Date(record.sleep).getHours()
-const wakeTime=new Date(record.wake).getHours()
+const sleepTime = new Date(record.sleep).getHours()
+const wakeTime = new Date(record.wake).getHours()
 
-const valid=
-(sleepTime<=START_HOUR||sleepTime>=21)&&
-wakeTime>=END_HOUR
+const valid =
+(sleepTime <= START_HOUR || sleepTime >= 21) &&
+wakeTime >= END_HOUR
 
 if(!valid){
-
-data.money-=10
-record.result="違規 ❌"
-
+data.money -= 10
+record.result = "違規 ❌"
 }else{
+record.result = "成功 ✅"
+}
 
-record.result="成功 ✅"
+record.evaluated = true
 
 }
 
-record.evaluated=true
-
 }
 
-}
+/* =========================
+   顯示
+========================= */
 
 async function render(){
 
-const data=await getData()
+try{
 
-const today=getTodayKey()
-
-const record=data.records?.[today]
+const data = await getData()
+const today = getTodayKey()
+const record = data.records?.[today]
 
 if(!record){
 
-document.getElementById("todayStatus").innerText="今天尚未打卡"
+document.getElementById("todayStatus").innerText = "今天尚未打卡"
 
 }else{
 
-const sleep=record.sleep?
-new Date(record.sleep).toLocaleString():"未打卡"
+const sleep = record.sleep ?
+new Date(record.sleep).toLocaleString() : "未打卡"
 
-const wake=record.wake?
-new Date(record.wake).toLocaleString():"未打卡"
+const wake = record.wake ?
+new Date(record.wake).toLocaleString() : "未打卡"
 
-const result=record.result||"尚未判定"
+const result = record.result || "尚未判定"
 
-document.getElementById("todayStatus").innerText=
+document.getElementById("todayStatus").innerText =
 `😴 睡覺時間：${sleep}
 🌞 起床時間：${wake}
 📊 結果：${result}`
 
 }
 
-document.getElementById("money").innerText=
-(data.money??0)+" 元"
+document.getElementById("money").innerText =
+(data.money ?? 0) + " 元"
+
+}catch(e){
+console.log("render error",e)
+}
 
 }
+
+/* =========================
+   啟動
+========================= */
 
 initWeek()
 render()
