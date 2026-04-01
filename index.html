@@ -38,7 +38,7 @@
 
 <script>
 
-// ⭐ 06:00 日界線
+// 🕕 日界線
 function getDayKey(date = new Date()){
 const d = new Date(date);
 if(d.getHours() < 6){
@@ -61,7 +61,7 @@ function saveData(data){
 localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-// ⭐ 記錄（最多10筆）
+// ➕ 記錄
 function addLog(data, type, delta){
 
 data.logs.push({
@@ -77,7 +77,7 @@ data.logs = data.logs.slice(-10);
 
 }
 
-// ⭐ 每周獎勵（一定寫入）
+// 🪙 每周獎勵
 function weeklyReward(data){
 
 const today = getDayKey();
@@ -85,31 +85,34 @@ const now = new Date();
 
 if(now.getDay() !== 4) return;
 
-const exists = data.logs.some(l => 
+const exists = data.logs.some(l =>
 l.dateKey === today && l.type === "每周獎勵"
 );
 
 if(!exists){
-addLog(data, "每周獎勵", 20);
+addLog(data,"每周獎勵",20);
 }
 
 }
 
-// ⭐ 判定（跨越 02:00~05:00）
+// 😴 判定（完整覆蓋 2~5）
 function isValidSleep(sleepTime, wakeTime){
 
-const start = new Date(sleepTime);
-const end = new Date(wakeTime);
+const sleep = new Date(sleepTime);
+const wake = new Date(wakeTime);
 
-let cur = new Date(start);
+const base = new Date(sleep);
+base.setHours(0,0,0,0);
 
-while(cur <= end){
-const h = cur.getHours();
-if(h >= 2 && h < 5) return true;
-cur.setMinutes(cur.getMinutes() + 10);
-}
+const start = new Date(base);
+start.setHours(2,0,0,0);
 
-return false;
+const end = new Date(base);
+end.setHours(5,0,0,0);
+
+// ⭐ 必須完整覆蓋
+return sleep <= start && wake >= end;
+
 }
 
 // 打卡
@@ -121,11 +124,6 @@ const key = getDayKey();
 if(!data.checkins[key]) data.checkins[key] = {};
 
 const r = data.checkins[key];
-
-if(r.evaluated){
-alert("已結算");
-return;
-}
 
 if(type === "sleep"){
 if(r.sleep) return alert("已打過");
@@ -141,10 +139,10 @@ r.wake = new Date().toISOString();
 const valid = isValidSleep(r.sleep, r.wake);
 
 if(valid){
-addLog(data, "成功", 0);
+addLog(data,"成功",0);
 r.result = "成功";
 }else{
-addLog(data, "違規", -10);
+addLog(data,"違規",-10);
 r.result = "違規";
 }
 
@@ -156,7 +154,7 @@ render();
 
 }
 
-// ⭐ 每日結算（06:00後執行）
+// ⏰ 每日結算
 function dailyCheck(data){
 
 const now = new Date();
@@ -169,7 +167,7 @@ for(let d in data.checkins){
 const r = data.checkins[d];
 
 if(d !== today && !r.evaluated){
-addLog(data, "未完成", -10);
+addLog(data,"未完成",-10);
 r.result = "未完成";
 r.evaluated = true;
 }
@@ -178,24 +176,13 @@ r.evaluated = true;
 
 }
 
-// ⭐ 取消（只要未結算就可）
+// ❌ 取消（只刪今天）
 function resetToday(){
 
 const data = getData();
 const key = getDayKey();
-const r = data.checkins[key];
 
-if(!r){
-alert("沒有打卡紀錄");
-return;
-}
-
-if(r.evaluated){
-alert("已結算，無法取消");
-return;
-}
-
-// ⭐ 只刪打卡相關（保留每周獎勵）
+// ⭐ 刪打卡紀錄（保留每周獎勵）
 data.logs = data.logs.filter(l =>
 !(l.dateKey === key && l.type !== "每周獎勵")
 );
@@ -233,7 +220,7 @@ renderHistory();
 
 }
 
-// 歷史
+// 歷史紀錄
 function renderHistory(){
 
 const data = getData();
