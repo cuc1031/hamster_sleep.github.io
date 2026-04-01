@@ -45,7 +45,6 @@ class="bg-gray-700 text-white px-4 py-2 rounded-xl w-full mb-3">
 <p id="money" class="text-2xl font-bold text-yellow-700"></p>
 </div>
 
-<!-- 歷史紀錄 -->
 <div id="historyBox" class="hidden bg-gray-50 rounded-xl p-3 max-h-60 overflow-y-auto text-sm"></div>
 
 </div>
@@ -67,7 +66,7 @@ function getTodayKey(){
 return new Date().toISOString().split('T')[0];
 }
 
-// ✅ 每週四 +20（只加一次）
+// ✅ 週四固定發錢（與打卡無關）
 function weeklyReward(data){
 
 const today = getTodayKey();
@@ -81,8 +80,9 @@ if(now.getDay() === 4 && data.lastRewardDate !== today){
 data.money += 20;
 
 if(!data.records) data.records = {};
-if(!data.records[today]) data.records[today] = {};
+if(!data.records[today]) data.records[today] = {delta:0};
 
+data.records[today].weeklyReward = 20;
 data.records[today].delta = (data.records[today].delta || 0) + 20;
 data.records[today].reward = true;
 
@@ -92,12 +92,10 @@ data.lastRewardDate = today;
 
 }
 
-// ✅ 打卡
+// ✅ 打卡（不再觸發週四獎勵）
 function checkIn(type){
 
 let data = getData();
-weeklyReward(data);
-
 const today = getTodayKey();
 
 if(!data.records) data.records = {};
@@ -155,10 +153,9 @@ r.evaluated = true;
 
 }
 
-// ✅ 每日未完成扣款（只扣一次）
-function dailyCheck(){
+// ✅ 每日未完成扣款
+function dailyCheck(data){
 
-const data = getData();
 const today = getTodayKey();
 
 for(let d in (data.records||{})){
@@ -176,11 +173,9 @@ r.evaluated = true;
 
 }
 
-saveData(data);
-
 }
 
-// ✅ 重置（完全還原）
+// ✅ 重置（保留週四獎勵）
 function resetToday(){
 
 const data = getData();
@@ -189,16 +184,22 @@ const r = data.records?.[today];
 
 if(!r) return alert("沒紀錄");
 
-// 還原金額（關鍵）
-data.money -= (r.delta || 0);
+// ⭐ 只還原「打卡影響」，不動週四獎勵
+const delta = r.delta || 0;
+const weekly = r.weeklyReward || 0;
 
-// 還原週四
-if(data.lastRewardDate === today){
-data.lastRewardDate = "";
-}
+data.money -= (delta - weekly);
 
-// 刪除紀錄
+// 如果今天有週四獎勵 → 保留
+if(r.weeklyReward){
+data.records[today] = {
+weeklyReward: r.weeklyReward,
+delta: r.weeklyReward,
+reward: true
+};
+}else{
 delete data.records[today];
+}
 
 saveData(data);
 render();
@@ -247,7 +248,7 @@ const r = records[d];
 html += `
 <div class="border-b py-1">
 📅 ${d}<br>
-📊 ${r.result || "未完成"}<br>
+📊 ${r.result || (r.reward ? "週四獎勵 🎁" : "未完成")}<br>
 💰 ${r.delta || 0}
 </div>`;
 });
@@ -260,8 +261,14 @@ function toggleHistory(){
 historyBox.classList.toggle("hidden");
 }
 
-weeklyReward(getData());
-dailyCheck();
+// ✅ 初始化（關鍵修正）
+let data = getData();
+
+weeklyReward(data);
+dailyCheck(data);
+
+saveData(data); // ⭐ 一定要存
+
 render();
 
 </script>
