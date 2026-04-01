@@ -11,33 +11,33 @@
 
 <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-md">
 
-<h1 class="text-2xl font-bold text-center mb-4">🐹 小倉睡覺存錢筒</h1>
+<h1 class="text-2xl font-bold text-center mb-4">小倉睡覺存錢筒</h1>
 
-<div class="flex justify-between mb-4">
+<div class="flex gap-2 mb-4">
 <button onclick="checkIn('sleep')" id="sleepBtn"
-class="bg-indigo-500 text-white px-4 py-2 rounded-xl w-1/2 mr-2">
-😴 睡覺打卡
+class="bg-indigo-500 text-white px-4 py-2 rounded-xl w-full">
+睡覺打卡
 </button>
 
 <button onclick="checkIn('wake')" id="wakeBtn"
-class="bg-green-500 text-white px-4 py-2 rounded-xl w-1/2 ml-2">
-🌞 起床打卡
+class="bg-green-500 text-white px-4 py-2 rounded-xl w-full">
+起床打卡
 </button>
 </div>
 
 <button onclick="resetToday()"
 class="bg-red-500 text-white px-4 py-2 rounded-xl w-full mb-3">
-↩️ 取消打卡
+取消今日打卡
 </button>
 
 <button onclick="toggleHistory()"
 class="bg-gray-700 text-white px-4 py-2 rounded-xl w-full mb-3">
-📜 打卡紀錄
+打卡紀錄
 </button>
 
 <div class="bg-gray-100 rounded-xl p-3 mb-3">
 <p class="text-sm text-gray-600">今日狀態</p>
-<pre id="todayStatus" class="text-sm"></pre>
+<pre id="todayStatus"></pre>
 </div>
 
 <div class="bg-yellow-100 rounded-xl p-3 text-center mb-3">
@@ -45,17 +45,14 @@ class="bg-gray-700 text-white px-4 py-2 rounded-xl w-full mb-3">
 <p id="money" class="text-2xl font-bold text-yellow-700"></p>
 </div>
 
-<div id="historyBox" class="hidden bg-gray-50 rounded-xl p-3 max-h-60 overflow-y-auto text-sm"></div>
+<div id="historyBox" class="hidden bg-gray-50 rounded-xl p-3 max-h-60 overflow-y-auto text-xs"></div>
 
 </div>
 
 <script>
 
-const START_HOUR = 2;
-const END_HOUR = 5;
-
 function getData(){
-return JSON.parse(localStorage.getItem('sleepData') || '{}');
+return JSON.parse(localStorage.getItem('sleepData') || '{"money":0,"logs":[],"checkins":{}}');
 }
 
 function saveData(data){
@@ -66,140 +63,90 @@ function getTodayKey(){
 return new Date().toISOString().split('T')[0];
 }
 
-// ✅ 週四固定發錢（與打卡無關）
+// ✅ 新增一筆記錄
+function addLog(data, type, delta){
+
+data.money += delta;
+
+data.logs.push({
+date: new Date().toLocaleDateString(),
+type,
+delta,
+total: data.money
+});
+
+}
+
+// ✅ 每周獎勵
 function weeklyReward(data){
 
 const today = getTodayKey();
 const now = new Date();
 
-if(data.money === undefined) data.money = 0;
 if(!data.lastRewardDate) data.lastRewardDate = "";
 
 if(now.getDay() === 4 && data.lastRewardDate !== today){
 
-data.money += 20;
-
-if(!data.records) data.records = {};
-if(!data.records[today]) data.records[today] = {delta:0};
-
-data.records[today].weeklyReward = 20;
-data.records[today].delta = (data.records[today].delta || 0) + 20;
-data.records[today].reward = true;
-
+addLog(data,"每周獎勵",20);
 data.lastRewardDate = today;
 
 }
 
 }
 
-// ✅ 打卡（不再觸發週四獎勵）
+// 打卡
 function checkIn(type){
 
 let data = getData();
 const today = getTodayKey();
 
-if(!data.records) data.records = {};
-if(!data.records[today]) data.records[today] = {delta:0};
+if(!data.checkins[today]) data.checkins[today] = {};
 
-const record = data.records[today];
+const r = data.checkins[today];
 
-if(record.evaluated){
-alert("今天已完成！");
-return;
+if(type==="sleep"){
+if(r.sleep) return alert("已打過");
+r.sleep = new Date().toISOString();
 }
 
-if(type === "sleep"){
-if(record.sleep) return alert("已打過");
-record.sleep = new Date().toISOString();
-}
-
-if(type === "wake"){
-if(!record.sleep) return alert("先睡覺");
-if(record.wake) return alert("已打過");
-record.wake = new Date().toISOString();
-}
+if(type==="wake"){
+if(!r.sleep) return alert("先睡覺");
+if(r.wake) return alert("已打過");
+r.wake = new Date().toISOString();
 
 evaluate(today,data);
+}
+
 saveData(data);
 render();
 
 }
 
-// ✅ 判定
+// 判定
 function evaluate(today,data){
 
-const r = data.records[today];
-
-if(r.evaluated) return;
-
-if(r.sleep && r.wake){
+const r = data.checkins[today];
 
 const sleepH = new Date(r.sleep).getHours();
 const wakeH = new Date(r.wake).getHours();
 
-const valid = (sleepH <= 2 || sleepH >= 21) && wakeH >= 5;
+const valid = (sleepH <=2 || sleepH>=21) && wakeH>=5;
 
 if(!valid){
-data.money -= 10;
-r.delta -= 10;
-r.result = "違規 ❌";
+addLog(data,"違規",-10);
 }else{
-r.result = "成功 ✅";
-}
-
-r.evaluated = true;
-
+addLog(data,"成功",0);
 }
 
 }
 
-// ✅ 每日未完成扣款
-function dailyCheck(data){
-
-const today = getTodayKey();
-
-for(let d in (data.records||{})){
-
-const r = data.records[d];
-
-if(d !== today && !r.evaluated){
-
-data.money -= 10;
-r.delta = (r.delta||0) -10;
-r.result = "未完成 ❌";
-r.evaluated = true;
-
-}
-
-}
-
-}
-
-// ✅ 重置（保留週四獎勵）
+// 重置（只刪打卡）
 function resetToday(){
 
 const data = getData();
 const today = getTodayKey();
-const r = data.records?.[today];
 
-if(!r) return alert("沒紀錄");
-
-// ⭐ 只還原「打卡影響」，不動週四獎勵
-const delta = r.delta || 0;
-const weekly = r.weeklyReward || 0;
-
-data.money -= (delta - weekly);
-
-// 如果今天有週四獎勵 → 保留
-if(r.weeklyReward){
-data.records[today] = {
-weeklyReward: r.weeklyReward,
-delta: r.weeklyReward,
-reward: true
-};
-}else{
-delete data.records[today];
-}
+delete data.checkins[today];
 
 saveData(data);
 render();
@@ -211,49 +158,46 @@ function render(){
 
 const data = getData();
 const today = getTodayKey();
-const r = data.records?.[today];
+const r = data.checkins[today];
 
 if(!r){
 todayStatus.innerText = "今天尚未打卡";
 }else{
 todayStatus.innerText =
-`😴 ${r.sleep ? new Date(r.sleep).toLocaleString():"未打卡"}
-🌞 ${r.wake ? new Date(r.wake).toLocaleString():"未打卡"}
-📊 ${r.result || "未判定"}
-💰 變動：${r.delta||0}`;
+`睡覺：${r.sleep ? new Date(r.sleep).toLocaleString():"未打卡"}
+起床：${r.wake ? new Date(r.wake).toLocaleString():"未打卡"}`;
 }
 
-money.innerText = (data.money||0)+" 元";
-
-sleepBtn.disabled = r?.sleep;
-wakeBtn.disabled = !r?.sleep || r?.wake;
+money.innerText = data.money + " 元";
 
 renderHistory();
 
 }
 
-// 歷史紀錄
+// 歷史紀錄（真正逐筆）
 function renderHistory(){
 
 const data = getData();
 const box = document.getElementById("historyBox");
 
-let html = "";
+let html = `
+<div class="grid grid-cols-4 font-bold border-b pb-1 mb-1">
+<span>日期</span><span>項目</span><span>變動</span><span>總額</span>
+</div>
+`;
 
-const records = data.records || {};
-
-Object.keys(records).sort().reverse().forEach(d=>{
-const r = records[d];
-
+data.logs.slice().reverse().forEach(log=>{
 html += `
-<div class="border-b py-1">
-📅 ${d}<br>
-📊 ${r.result || (r.reward ? "週四獎勵 🎁" : "未完成")}<br>
-💰 ${r.delta || 0}
-</div>`;
+<div class="grid grid-cols-4 border-b py-1">
+<span>${log.date}</span>
+<span>${log.type}</span>
+<span>${log.delta}</span>
+<span>${log.total}</span>
+</div>
+`;
 });
 
-box.innerHTML = html || "尚無紀錄";
+box.innerHTML = html;
 
 }
 
@@ -261,14 +205,10 @@ function toggleHistory(){
 historyBox.classList.toggle("hidden");
 }
 
-// ✅ 初始化（關鍵修正）
+// 初始化
 let data = getData();
-
 weeklyReward(data);
-dailyCheck(data);
-
-saveData(data); // ⭐ 一定要存
-
+saveData(data);
 render();
 
 </script>
