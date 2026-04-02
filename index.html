@@ -38,11 +38,20 @@
 
 <script>
 
-// 🕕 日界線
+// 🕕 日界線（06:00）
 function getDayKey(date = new Date()){
 const d = new Date(date);
 if(d.getHours() < 6) d.setDate(d.getDate()-1);
 return d.toISOString().split('T')[0];
+}
+
+// 📅 固定 yyyy/mm/dd
+function formatDate(dateKey){
+const d = new Date(dateKey);
+const y = d.getFullYear();
+const m = String(d.getMonth()+1).padStart(2,'0');
+const day = String(d.getDate()).padStart(2,'0');
+return `${y}/${m}/${day}`;
 }
 
 // 初始化
@@ -58,11 +67,11 @@ function saveData(data){
 localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-// 記錄
+// ➕ 記錄
 function addLog(data, type, delta, dateKey){
 data.logs.push({
 dateKey,
-date: dateKey,
+date: formatDate(dateKey),
 type,
 delta
 });
@@ -71,7 +80,7 @@ data.logs = data.logs.slice(-10);
 }
 }
 
-// ⭐ 補算所有天數（核心）
+// ⭐ 補算所有天數（含未登入）
 function processDays(data){
 
 let last = new Date(data.lastCheckedDate);
@@ -83,15 +92,19 @@ last.setDate(last.getDate()+1);
 const key = last.toISOString().split('T')[0];
 const weekday = new Date(key).getDay();
 
-// 🎁 每周獎勵（只會在該 dayKey 一次）
+// 🎁 每周獎勵（只會一次）
 if(weekday === 4){
+const exists = data.logs.some(l=>l.dateKey===key && l.type==="每周獎勵");
+if(!exists){
 addLog(data,"每周獎勵",20,key);
+}
 }
 
 // ❌ 未完成
 const r = data.checkins[key];
 if(!r || !r.evaluated){
 addLog(data,"未完成",-10,key);
+
 if(!data.checkins[key]) data.checkins[key]={};
 data.checkins[key].evaluated=true;
 data.checkins[key].result="未完成";
@@ -103,7 +116,7 @@ data.lastCheckedDate = getDayKey();
 
 }
 
-// 😴 判定
+// 😴 判定（完整覆蓋 2~5）
 function isValidSleep(sleepTime, wakeTime){
 
 const sleep = new Date(sleepTime);
@@ -160,7 +173,7 @@ render();
 
 }
 
-// 取消
+// ❌ 取消（只刪今天）
 function resetToday(){
 
 const data = getData();
@@ -187,6 +200,7 @@ saveData(data);
 const key = getDayKey();
 const r = data.checkins[key];
 
+// 💰 計算總額
 let total = 0;
 data.logs.forEach(l=> total+=l.delta);
 
@@ -205,7 +219,7 @@ renderHistory();
 
 }
 
-// 歷史
+// 📜 歷史紀錄
 function renderHistory(){
 
 const data = getData();
