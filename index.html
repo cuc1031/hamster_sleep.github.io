@@ -38,22 +38,25 @@
 
 <script>
 
+// 🕕 日界線
 function getDayKey(date = new Date()){
 const d = new Date(date);
 if(d.getHours() < 6) d.setDate(d.getDate()-1);
 return d.toISOString().split('T')[0];
 }
 
-function formatDate(dateKey){
-const d = new Date(dateKey);
+// 📅 格式
+function formatDate(key){
+const d = new Date(key);
 return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// 初始化
 function getData(){
 let data = JSON.parse(localStorage.getItem('sleepData') || '{}');
-if(!data.logs) data.logs = [];
-if(!data.checkins) data.checkins = {};
-if(!data.lastCheckedDate) data.lastCheckedDate = getDayKey();
+if(!data.logs) data.logs=[];
+if(!data.checkins) data.checkins={};
+if(!data.lastCheckedDate) data.lastCheckedDate=getDayKey();
 return data;
 }
 
@@ -61,71 +64,71 @@ function saveData(data){
 localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-function addLog(data, type, delta, key){
-data.logs.push({
-dateKey: key,
-date: formatDate(key),
-type,
-delta
-});
-if(data.logs.length > 10){
-data.logs = data.logs.slice(-10);
+// 記錄
+function addLog(data,type,delta,key){
+data.logs.push({dateKey:key,date:formatDate(key),type,delta});
+if(data.logs.length>10){
+data.logs=data.logs.slice(-10);
 }
 }
 
-// ⭐ 單日處理（已修未完成）
-function processOneDay(data, key){
+// ⭐ 處理單日（修正版）
+function processOneDay(data,key,todayKey){
 
 const weekday = new Date(key).getDay();
 
-// 每週四獎勵
-if(weekday === 4){
-const exists = data.logs.some(l => l.dateKey===key && l.type==="每周獎勵");
+// 每週四
+if(weekday===4){
+const exists = data.logs.some(l=>l.dateKey===key && l.type==="每周獎勵");
 if(!exists){
 addLog(data,"每周獎勵",20,key);
 }
 }
 
-// ✅ 未完成（正確邏輯）
+// ❗ 未完成只處理「昨天以前」
+if(key === todayKey) return;
+
 const r = data.checkins[key];
 const isCompleted = r && r.sleep && r.wake;
 
 if(!isCompleted){
-
+const exists = data.logs.some(l=>l.dateKey===key && l.type==="未完成");
+if(!exists){
 addLog(data,"未完成",-10,key);
+}
 
 if(!data.checkins[key]) data.checkins[key]={};
-
-data.checkins[key].evaluated = true;
-data.checkins[key].result = "未完成";
-
+data.checkins[key].evaluated=true;
+data.checkins[key].result="未完成";
 }
 
 }
 
+// ⭐ 補算
 function processDays(data){
 
-let last = new Date(data.lastCheckedDate);
 let todayKey = getDayKey();
+let last = new Date(data.lastCheckedDate);
 let today = new Date(todayKey);
 
 while(last < today){
 last.setDate(last.getDate()+1);
 const key = last.toISOString().split('T')[0];
-processOneDay(data, key);
+processOneDay(data,key,todayKey);
 }
 
-processOneDay(data, todayKey);
+processOneDay(data,todayKey,todayKey);
 
 data.lastCheckedDate = todayKey;
 }
 
-function isValidSleep(sleepTime, wakeTime){
+// 😴 判定
+function isValidSleep(sleep,wake){
 
-const sleep = new Date(sleepTime);
-const wake = new Date(wakeTime);
+const s = new Date(sleep);
+const w = new Date(wake);
 
-const base = new Date(sleep);
+const base = new Date(s);
 base.setHours(0,0,0,0);
 
 const start = new Date(base);
@@ -134,29 +137,29 @@ start.setHours(2,0,0,0);
 const end = new Date(base);
 end.setHours(5,0,0,0);
 
-return sleep <= start && wake >= end;
+return s<=start && w>=end;
 }
 
+// 打卡
 function checkIn(type){
 
 let data = getData();
 processDays(data);
 
 const key = getDayKey();
-
-if(!data.checkins[key]) data.checkins[key] = {};
+if(!data.checkins[key]) data.checkins[key]={};
 const r = data.checkins[key];
 
 if(type==="sleep"){
 if(r.sleep) return alert("已打過");
-r.sleep = new Date().toISOString();
+r.sleep=new Date().toISOString();
 }
 
 if(type==="wake"){
 if(!r.sleep) return alert("先睡覺");
 if(r.wake) return alert("已打過");
 
-r.wake = new Date().toISOString();
+r.wake=new Date().toISOString();
 
 if(isValidSleep(r.sleep,r.wake)){
 addLog(data,"成功",0,key);
@@ -173,7 +176,9 @@ saveData(data);
 render();
 }
 
+// 取消
 function resetToday(){
+
 const data = getData();
 const key = getDayKey();
 
@@ -187,39 +192,39 @@ saveData(data);
 render();
 }
 
+// UI
 function render(){
 
 const data = getData();
 const key = getDayKey();
 const r = data.checkins[key];
 
-let total = 0;
-data.logs.forEach(l=> total+=l.delta);
+let total=0;
+data.logs.forEach(l=>total+=l.delta);
 
-money.innerText = total+" 元";
+money.innerText=total+" 元";
 
 if(!r){
 todayStatus.innerText="今天尚未打卡";
 }else{
-todayStatus.innerText =
-`睡覺：${r.sleep ? new Date(r.sleep).toLocaleString():"未打卡"}
-起床：${r.wake ? new Date(r.wake).toLocaleString():"未打卡"}
-結果：${r.result || "未完成"}`;
+todayStatus.innerText=
+`睡覺：${r.sleep?new Date(r.sleep).toLocaleString():"未打卡"}
+起床：${r.wake?new Date(r.wake).toLocaleString():"未打卡"}
+結果：${r.result||"未完成"}`;
 }
 
 renderHistory();
 }
 
+// 歷史
 function renderHistory(){
 
-const data = getData();
+const data=getData();
 let total=0;
 
-let html=`
-<div class="grid grid-cols-4 font-bold border-b pb-1 mb-1">
+let html=`<div class="grid grid-cols-4 font-bold border-b pb-1 mb-1">
 <span>日期</span><span>項目</span><span>變動</span><span>總額</span>
-</div>
-`;
+</div>`;
 
 data.logs.forEach(l=>{
 total+=l.delta;
@@ -233,8 +238,7 @@ html+=`
 <span>${l.type}</span>
 <span>${l.delta}</span>
 <span>${l.total}</span>
-</div>
-`;
+</div>`;
 });
 
 historyBox.innerHTML=html;
@@ -244,7 +248,16 @@ function toggleHistory(){
 historyBox.classList.toggle("hidden");
 }
 
+// ⭐ 自動每分鐘檢查
+setInterval(()=>{
 let data = getData();
+processDays(data);
+saveData(data);
+render();
+},60000);
+
+// 初始化
+let data=getData();
 processDays(data);
 saveData(data);
 render();
