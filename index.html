@@ -78,7 +78,7 @@ function processOneDay(data,key,todayKey){
 const weekday = new Date(key).getDay();
 
 // 每週四
-if(weekday===4){
+if(weekday===5){
 const exists = data.logs.some(l=>l.dateKey===key && l.type==="每周獎勵");
 if(!exists){
 addLog(data,"每周獎勵",20,key);
