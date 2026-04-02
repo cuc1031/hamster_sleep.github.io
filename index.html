@@ -41,19 +41,16 @@
 // 🕕 日界線
 function getDayKey(date = new Date()){
 const d = new Date(date);
-if(d.getHours() < 6){
-d.setDate(d.getDate() - 1);
-}
+if(d.getHours() < 6) d.setDate(d.getDate()-1);
 return d.toISOString().split('T')[0];
 }
 
 // 初始化
 function getData(){
 let data = JSON.parse(localStorage.getItem('sleepData') || '{}');
-
 if(!data.logs) data.logs = [];
 if(!data.checkins) data.checkins = {};
-
+if(!data.lastCheckedDate) data.lastCheckedDate = getDayKey();
 return data;
 }
 
@@ -61,41 +58,52 @@ function saveData(data){
 localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-// ➕ 記錄
-function addLog(data, type, delta){
-
+// 記錄
+function addLog(data, type, delta, dateKey){
 data.logs.push({
-dateKey: getDayKey(),
-date: new Date().toLocaleDateString(),
+dateKey,
+date: dateKey,
 type,
 delta
 });
-
 if(data.logs.length > 10){
 data.logs = data.logs.slice(-10);
 }
+}
+
+// ⭐ 補算所有天數（核心）
+function processDays(data){
+
+let last = new Date(data.lastCheckedDate);
+let today = new Date(getDayKey());
+
+while(last < today){
+
+last.setDate(last.getDate()+1);
+const key = last.toISOString().split('T')[0];
+const weekday = new Date(key).getDay();
+
+// 🎁 每周獎勵（只會在該 dayKey 一次）
+if(weekday === 4){
+addLog(data,"每周獎勵",20,key);
+}
+
+// ❌ 未完成
+const r = data.checkins[key];
+if(!r || !r.evaluated){
+addLog(data,"未完成",-10,key);
+if(!data.checkins[key]) data.checkins[key]={};
+data.checkins[key].evaluated=true;
+data.checkins[key].result="未完成";
+}
 
 }
 
-// 🪙 每周獎勵
-function weeklyReward(data){
-
-const today = getDayKey();
-const now = new Date();
-
-if(now.getDay() !== 4) return;
-
-const exists = data.logs.some(l =>
-l.dateKey === today && l.type === "每周獎勵"
-);
-
-if(!exists){
-addLog(data,"每周獎勵",20);
-}
+data.lastCheckedDate = getDayKey();
 
 }
 
-// 😴 判定（完整覆蓋 2~5）
+// 😴 判定
 function isValidSleep(sleepTime, wakeTime){
 
 const sleep = new Date(sleepTime);
@@ -110,7 +118,6 @@ start.setHours(2,0,0,0);
 const end = new Date(base);
 end.setHours(5,0,0,0);
 
-// ⭐ 必須完整覆蓋
 return sleep <= start && wake >= end;
 
 }
@@ -119,34 +126,33 @@ return sleep <= start && wake >= end;
 function checkIn(type){
 
 let data = getData();
+processDays(data);
+
 const key = getDayKey();
 
 if(!data.checkins[key]) data.checkins[key] = {};
-
 const r = data.checkins[key];
 
-if(type === "sleep"){
+if(type==="sleep"){
 if(r.sleep) return alert("已打過");
 r.sleep = new Date().toISOString();
 }
 
-if(type === "wake"){
+if(type==="wake"){
 if(!r.sleep) return alert("先睡覺");
 if(r.wake) return alert("已打過");
 
 r.wake = new Date().toISOString();
 
-const valid = isValidSleep(r.sleep, r.wake);
-
-if(valid){
-addLog(data,"成功",0);
-r.result = "成功";
+if(isValidSleep(r.sleep,r.wake)){
+addLog(data,"成功",0,key);
+r.result="成功";
 }else{
-addLog(data,"違規",-10);
-r.result = "違規";
+addLog(data,"違規",-10,key);
+r.result="違規";
 }
 
-r.evaluated = true;
+r.evaluated=true;
 }
 
 saveData(data);
@@ -154,37 +160,14 @@ render();
 
 }
 
-// ⏰ 每日結算
-function dailyCheck(data){
-
-const now = new Date();
-if(now.getHours() < 6) return;
-
-const today = getDayKey();
-
-for(let d in data.checkins){
-
-const r = data.checkins[d];
-
-if(d !== today && !r.evaluated){
-addLog(data,"未完成",-10);
-r.result = "未完成";
-r.evaluated = true;
-}
-
-}
-
-}
-
-// ❌ 取消（只刪今天）
+// 取消
 function resetToday(){
 
 const data = getData();
 const key = getDayKey();
 
-// ⭐ 刪打卡紀錄（保留每周獎勵）
 data.logs = data.logs.filter(l =>
-!(l.dateKey === key && l.type !== "每周獎勵")
+!(l.dateKey===key && l.type!=="每周獎勵")
 );
 
 delete data.checkins[key];
@@ -198,17 +181,19 @@ render();
 function render(){
 
 const data = getData();
+processDays(data);
+saveData(data);
+
 const key = getDayKey();
 const r = data.checkins[key];
 
-// 計算總額
 let total = 0;
-data.logs.forEach(l => total += l.delta);
+data.logs.forEach(l=> total+=l.delta);
 
-money.innerText = total + " 元";
+money.innerText = total+" 元";
 
 if(!r){
-todayStatus.innerText = "今天尚未打卡";
+todayStatus.innerText="今天尚未打卡";
 }else{
 todayStatus.innerText =
 `睡覺：${r.sleep ? new Date(r.sleep).toLocaleString():"未打卡"}
@@ -220,25 +205,25 @@ renderHistory();
 
 }
 
-// 歷史紀錄
+// 歷史
 function renderHistory(){
 
 const data = getData();
-let total = 0;
+let total=0;
 
-let html = `
+let html=`
 <div class="grid grid-cols-4 font-bold border-b pb-1 mb-1">
 <span>日期</span><span>項目</span><span>變動</span><span>總額</span>
 </div>
 `;
 
 data.logs.forEach(l=>{
-total += l.delta;
-l.total = total;
+total+=l.delta;
+l.total=total;
 });
 
 data.logs.slice().reverse().forEach(l=>{
-html += `
+html+=`
 <div class="grid grid-cols-4 border-b py-1">
 <span>${l.date}</span>
 <span>${l.type}</span>
@@ -248,7 +233,7 @@ html += `
 `;
 });
 
-historyBox.innerHTML = html;
+historyBox.innerHTML=html;
 
 }
 
@@ -257,12 +242,6 @@ historyBox.classList.toggle("hidden");
 }
 
 // 初始化
-let data = getData();
-
-weeklyReward(data);
-dailyCheck(data);
-
-saveData(data);
 render();
 
 </script>
