@@ -45,7 +45,7 @@ if(d.getHours() < 6) d.setDate(d.getDate()-1);
 return d.toISOString().split('T')[0];
 }
 
-// 📅 固定日期格式
+// 📅 固定格式
 function formatDate(dateKey){
 const d = new Date(dateKey);
 const y = d.getFullYear();
@@ -80,7 +80,7 @@ data.logs = data.logs.slice(-10);
 }
 }
 
-// ⭐ 補算
+// ⭐ 補算（含未登入 + 每週五獎勵）
 function processDays(data){
 
 let last = new Date(data.lastCheckedDate);
@@ -92,15 +92,15 @@ last.setDate(last.getDate()+1);
 const key = last.toISOString().split('T')[0];
 const weekday = new Date(key).getDay();
 
-// 每周獎勵
-if(weekday === 4){
-const exists = data.logs.some(l=>l.dateKey===key && l.type==="每周獎勵");
+// 🎁 每週五獎勵
+if(weekday === 5){
+const exists = data.logs.some(l => l.dateKey===key && l.type==="每周獎勵");
 if(!exists){
 addLog(data,"每周獎勵",20,key);
 }
 }
 
-// 未完成
+// ❌ 未完成
 const r = data.checkins[key];
 if(!r || !r.evaluated){
 addLog(data,"未完成",-10,key);
@@ -115,7 +115,7 @@ data.checkins[key].result="未完成";
 data.lastCheckedDate = getDayKey();
 }
 
-// 睡眠判定（完整覆蓋2~5）
+// 😴 判定
 function isValidSleep(sleepTime, wakeTime){
 
 const sleep = new Date(sleepTime);
@@ -170,7 +170,7 @@ saveData(data);
 render();
 }
 
-// 取消
+// ❌ 取消（不影響每周獎勵）
 function resetToday(){
 
 const data = getData();
@@ -245,7 +245,7 @@ function toggleHistory(){
 historyBox.classList.toggle("hidden");
 }
 
-// 初始化（只在這裡補算）
+// 初始化
 let data = getData();
 processDays(data);
 saveData(data);
