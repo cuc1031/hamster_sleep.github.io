@@ -80,7 +80,7 @@ data.logs = data.logs.slice(-10);
 }
 }
 
-// ⭐ 補算（含未登入 + 每週五獎勵）
+// ⭐ 補算（含未登入 + 每週四獎勵）
 function processDays(data){
 
 let last = new Date(data.lastCheckedDate);
@@ -92,7 +92,7 @@ last.setDate(last.getDate()+1);
 const key = last.toISOString().split('T')[0];
 const weekday = new Date(key).getDay();
 
-// 🎁 每週五獎勵
+// 🎁 每週四獎勵（已修正）
 if(weekday === 4){
 const exists = data.logs.some(l => l.dateKey===key && l.type==="每周獎勵");
 if(!exists){
