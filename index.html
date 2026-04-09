@@ -38,25 +38,19 @@
 
 <script>
 
-// 📦 取得資料（含版本檢查）
+// 📦 初始化
 function getData(){
-
 let data = JSON.parse(localStorage.getItem('sleepData'));
-
-if(!data || data.version !== 2){
-
+if(!data || data.version !== 3){
 data = {
-version: 2,
+version: 3,
 money: 10,
 logs: [],
 checkins: {},
 lastRewardWeek: ""
 };
-
 localStorage.setItem("sleepData", JSON.stringify(data));
-
 }
-
 return data;
 }
 
@@ -64,7 +58,7 @@ function saveData(data){
 localStorage.setItem('sleepData', JSON.stringify(data));
 }
 
-// 📅 日期
+// 📅
 function getDateKey(d=new Date()){
 return d.toISOString().split('T')[0];
 }
@@ -74,16 +68,16 @@ const date = new Date(d);
 return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
 }
 
-// ➕ 紀錄
-function addLog(data,type,delta){
+// ➕ 記錄
+function addLog(data,type,delta,key){
 
 data.money += delta;
 
 data.logs.push({
-date: formatDate(new Date()),
+date: formatDate(key || new Date()),
 type,
 delta,
-total: data.money || 0
+total: data.money
 });
 
 if(data.logs.length>10){
@@ -111,15 +105,13 @@ const isAfter8 = now.getHours() >= 20;
 const weekKey = now.getFullYear()+"-"+getWeekNumber(now);
 
 if(isThursday && isAfter8 && data.lastRewardWeek !== weekKey){
-
 addLog(data,"每周獎勵",20);
 data.lastRewardWeek = weekKey;
-
 }
 
 }
 
-// ❌ 未完成
+// ❌ 未完成（一天最多扣一次）
 function checkMiss(data){
 
 const now = new Date();
@@ -131,21 +123,26 @@ const key = getDateKey(yesterday);
 if(!data.checkins[key]) data.checkins[key]={};
 const r = data.checkins[key];
 
-// 06:00 睡覺
-if(now.getHours() >= 6 && !r.sleep && !r.sleepChecked){
-addLog(data,"未完成(未睡)",-10);
-r.sleepChecked = true;
+// 已扣過就不再扣
+if(r.penalized) return;
+
+// 06:00 檢查 sleep
+if(now.getHours() >= 6 && !r.sleep){
+addLog(data,"未完成",-10,key);
+r.penalized = true;
+r.result="未完成";
 }
 
-// 12:00 起床
-if(now.getHours() >= 12 && !r.wake && !r.wakeChecked){
-addLog(data,"未完成(未起床)",-10);
-r.wakeChecked = true;
+// 12:00 檢查 wake（但前面沒扣過才扣）
+if(now.getHours() >= 12 && !r.wake && !r.penalized){
+addLog(data,"未完成",-10,key);
+r.penalized = true;
+r.result="未完成";
 }
 
 }
 
-// 😴 判定
+// 😴 成功條件（2:00~6:00 完整覆蓋）
 function isValidSleep(sleep,wake){
 
 const s = new Date(sleep);
@@ -158,9 +155,9 @@ const start = new Date(base);
 start.setHours(2,0,0,0);
 
 const end = new Date(base);
-end.setHours(5,0,0,0);
+end.setHours(6,0,0,0);
 
-return s<=start && w>=end;
+return s <= start && w >= end;
 }
 
 // 打卡
@@ -183,13 +180,17 @@ if(r.wake) return alert("已打過");
 
 r.wake=new Date().toISOString();
 
+if(!r.penalized){ // 確保只扣一次
 if(isValidSleep(r.sleep,r.wake)){
-addLog(data,"成功",0);
+addLog(data,"成功",0,key);
 r.result="成功";
 }else{
-addLog(data,"違規",-10);
+addLog(data,"違規",-10,key);
+r.penalized = true;
 r.result="違規";
 }
+}
+
 }
 
 saveData(data);
@@ -197,11 +198,20 @@ render();
 
 }
 
-// 取消
+// ❌ 取消（會還原金額）
 function resetToday(){
 
 let data = getData();
 const key = getDateKey();
+
+// 還原金額
+data.logs = data.logs.filter(l=>{
+if(l.date === formatDate(key) && l.type !== "每周獎勵"){
+data.money -= l.delta;
+return false;
+}
+return true;
+});
 
 delete data.checkins[key];
 
